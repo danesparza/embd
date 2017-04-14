@@ -1,6 +1,6 @@
 /*
-	This is a library for the HDC1000 Humidity & Temp Sensor
-	Designed specifically to work with the HDC1000 sensor from Adafruit
+	This is a library for the HDC1008 Humidity & Temp Sensor
+	Designed specifically to work with the HDC100x sensor from Adafruit
 	----> https://www.adafruit.com/products/2635
 
 	These sensors use I2C to communicate, 2 pins are required to
@@ -8,9 +8,9 @@
 
 	Written by Dan Esparza.
 
-	Taken in large part from the original Arduino based
-	source provided by Limor Fried / Ladyada here:
-	https://github.com/adafruit/Adafruit_HDC1000_Library/
+	For more information on the I2C operations for this sensor
+	see the spec sheet located here (specifically pages 10-15):
+	http://www.adafruit.com/datasheets/hdc1008.pdf
 */
 
 package hdc100x
@@ -67,29 +67,21 @@ type HDC100x struct {
 
 // New returns a handle to a HDC100x sensor.
 func New(bus embd.I2CBus) *HDC100x {
-	//	Initialize:
+	//	Initialize by setting the config register:
 	bus.WriteBytes(hdc1000Address, []byte{hdc1000ConfigRegister})
 
 	//	Return a new object
 	return &HDC100x{Bus: bus}
 }
 
-// Temperature returns the current temperature reading.
+// Temperature returns the current temperature reading in Fahrenheit
 func (d *HDC100x) Temperature() (float64, error) {
 	//	Send the command to get the temp
-	log.Println("Sending command to get the temp...")
 	if err := d.Bus.WriteByte(hdc1000Address, hdc1000TempRegister); err != nil {
 		return 0, err
 	}
 
-	log.Println("Sleeping...")
 	time.Sleep(65 * time.Millisecond)
-
-	//	I think we need to read multiple bytes based on
-	//	this line:
-	//	https://github.com/adafruit/Adafruit_HDC1000_Library/blob/master/Adafruit_HDC1000.cpp#L120
-	//	we should also look at this code:
-	//	https://github.com/switchdoclabs/SDL_Pi_HDC1000/blob/master/SDL_Pi_HDC1000.py
 
 	//	Read 2 byte temperature data
 	tempData, err := d.Bus.ReadBytes(hdc1000Address, 2)
@@ -99,10 +91,32 @@ func (d *HDC100x) Temperature() (float64, error) {
 
 	//	Combine 2 bytes into a single float64 & calculate temp
 	w := float64(uint32(tempData[0])<<8 + uint32(tempData[1]))
-	cTemp := (((w / 65536.0) * 165.0) - 40.0)
-	fTemp := (cTemp * 1.8) + 32
+	cTemp := (((w / 65536.0) * 165.0) - 40.0) //	Celsius
+	fTemp := (cTemp * 1.8) + 32               //	Fahrenheit
 
-	//	For now, just return the uncompensated temp
-	log.Printf("Returing temp: %v\n", cTemp)
+	//	Return the calculated temp
 	return fTemp, nil
+}
+
+// Humidity returns the current relative humidity percentage
+func (d *HDC100x) Humidity() (float64, error) {
+	//	Send the command to get the humidity
+	if err := d.Bus.WriteByte(hdc1000Address, hdc1000HumidityRegister); err != nil {
+		return 0, err
+	}
+
+	time.Sleep(65 * time.Millisecond)
+
+	//	Read 2 byte humidity data
+	humData, err := d.Bus.ReadBytes(hdc1000Address, 2)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//	Combine 2 bytes into a single float64 & calculate humidity
+	h := float64(uint32(humData[0])<<8 + uint32(humData[1]))
+	humidity := (h / 65536.0) * 100
+
+	//	Return the humidity
+	return humidity, nil
 }
