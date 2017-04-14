@@ -1,2 +1,2 @@
 # embd
-Repository for embd based sensors
+Repository for [embd](https://github.com/kidoman/embd) based sensors
