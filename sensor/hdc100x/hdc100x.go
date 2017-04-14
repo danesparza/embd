@@ -16,8 +16,6 @@
 package hdc100x
 
 import (
-	"encoding/binary"
-	"sync"
 	"time"
 
 	"log"
@@ -26,177 +24,85 @@ import (
 )
 
 const (
-	// I2CAddress is the address of this device on the i2c bus
-	I2CAddress = 0x40
+	//	I2C Address
+	hdc1000Address byte = 0x40
 
-	hdc1000Temp     = 0x00
-	hdc1000Humidity = 0x01
+	//	Registers
+	hdc1000TempRegister           byte = 0x00 // Temperature register
+	hdc1000HumidityRegister       byte = 0x01 // Humidity register
+	hdc1000ConfigRegister         byte = 0x02 // Config register
+	hdc1000ManufacturerIDRegister byte = 0xFE // Manufacturer ID
+	hdc1000DeviceIDRegister       byte = 0xFF // Device ID
+	hdc1000SerialHighRegister     byte = 0xFB
+	hdc1000SerialMidRegister      byte = 0xFC
+	hdc1000SerialBottomRegister   byte = 0xFD
 
-	configLocation = 0x02
-	configRST      = (1 << 15)
-	configHeat     = (1 << 13)
-	configMode     = (1 << 12)
-	configBatt     = (1 << 11)
-	configTres14   = 0
-	configTres11   = (1 << 10)
-	configHres14   = 0
-	configHres11   = (1 << 8)
-	configHres8    = (1 << 9)
+	//	Configuration register bits
+	configReset          = 0x8000 // bit 15
+	configHeaterEnable   = 0x2000 // bit 13
+	configAquisitionMode = 0x1000 // bit 12
+	configBatteryStatus  = 0x0800 // bit 11
+
+	configTemperatureResolution      = 0x0400 // bit 10
+	configTemperatureResolution14Bit = 0x0000 // bit 0
+	configTemperatureResolution11Bit = 0x0400 // bit 10
+
+	configHumidityResolutionHBit  = 0x0200 // bit 9
+	configHumidityResolutionLBit  = 0x0100 // bit 8
+	configHumidityResolution14Bit = 0x0000 // bit 0
+	configHumidityResolution11Bit = 0x0100 // bit 8
+	configHumidityResolution8Bit  = 0x0200 // bit 9
 
 	serial1  = 0xFB
 	serial2  = 0xFC
 	serial3  = 0xFD
 	manufID  = 0xFE
 	deviceID = 0xFF
-
-	pollDelay = 250
 )
 
 // HDC100x represents a HDC1000 series temperature and humidity sensor.
 type HDC100x struct {
-	Bus  embd.I2CBus
-	Poll int
-
-	//	The stuff below this can change
-	oss uint
-
-	ac1, ac2, ac3      int16
-	ac4, ac5, ac6      uint16
-	b1, b2, mb, mc, md int16
-	b5                 int32
-	calibrated         bool
-	cmu                sync.RWMutex
-
-	//	I like the idea of using channels to communicate values
-	temps     chan uint16
-	pressures chan int32
-	altitudes chan float64
-	quit      chan struct{}
+	Bus embd.I2CBus
 }
 
 // New returns a handle to a HDC100x sensor.
 func New(bus embd.I2CBus) *HDC100x {
-	return &HDC100x{Bus: bus, Poll: pollDelay}
+	//	Initialize:
+	bus.WriteBytes(hdc1000Address, []byte{hdc1000ConfigRegister})
+
+	//	Return a new object
+	return &HDC100x{Bus: bus}
 }
 
 // Temperature returns the current temperature reading.
 func (d *HDC100x) Temperature() (float64, error) {
-	select {
-	case t := <-d.temps:
-		temp := float64(t) / 10
-		return temp, nil
-	default:
-		log.Println("hdc100x: no temps available... measuring")
-		/*
-			t, err := d.measureTemp()
-			if err != nil {
-				return 0, err
-			}
-			temp := float64(t) / 10
-		*/
-		temp := float64(0)
-		return temp, nil
-	}
-}
-
-func (d *HDC100x) measureTemp() (uint32, error) {
-	/*
-		if err := d.calibrate(); err != nil {
-			return 0, err
-		}
-	*/
-
-	utemp, err := d.readUncompensatedTemp()
-	if err != nil {
+	//	Send the command to get the temp
+	log.Println("Sending command to get the temp...")
+	if err := d.Bus.WriteByte(hdc1000Address, hdc1000TempRegister); err != nil {
 		return 0, err
 	}
 
-	//	The Adafruit example goes through some machinations
-	//	to find the actual temperature.  I figure that would go right here
-	//	temp := d.calcTemp(utemp)
-
-	//	For now, just return the uncalculated temp
-	return utemp, nil
-}
-
-func (d *HDC100x) readUncompensatedTemp() (uint32, error) {
-
-	if err := d.Bus.WriteByte(I2CAddress, hdc1000Temp); err != nil {
-		return 0, err
-	}
-	time.Sleep(50)
+	log.Println("Sleeping...")
+	time.Sleep(65 * time.Millisecond)
 
 	//	I think we need to read multiple bytes based on
 	//	this line:
 	//	https://github.com/adafruit/Adafruit_HDC1000_Library/blob/master/Adafruit_HDC1000.cpp#L120
-	tempBytes, err := d.Bus.ReadBytes(I2CAddress, 4)
+	//	we should also look at this code:
+	//	https://github.com/switchdoclabs/SDL_Pi_HDC1000/blob/master/SDL_Pi_HDC1000.py
+
+	//	Read 2 byte temperature data
+	tempData, err := d.Bus.ReadBytes(hdc1000Address, 2)
 	if err != nil {
-		return 0, err
+		log.Fatal(err)
 	}
 
-	//	Because we now have a byte slice, we need to
-	//	convert to an unsigned int:
-	temp := binary.BigEndian.Uint32(tempBytes)
+	//	Combine 2 bytes into a single float64 & calculate temp
+	w := float64(uint32(tempData[0])<<8 + uint32(tempData[1]))
+	cTemp := (((w / 65536.0) * 165.0) - 40.0)
+	fTemp := (cTemp * 1.8) + 32
 
-	return temp, nil
-}
-
-// Run starts the sensor data acquisition loop.
-func (d *HDC100x) Run() {
-
-	//	Spawn a new goroutine
-	go func() {
-		d.quit = make(chan struct{})
-		timer := time.Tick(time.Duration(d.Poll) * time.Millisecond)
-
-		var temp uint16
-		var pressure int32
-		var altitude float64
-
-		for {
-			select {
-			case <-timer:
-				//	Measure temp
-				/*
-					t, err := d.measureTemp()
-					if err == nil {
-						temp = t
-					}
-					if err == nil && d.temps == nil {
-						d.temps = make(chan uint16)
-					}
-				*/
-
-				//	Measure humidity
-				/*
-					p, a, err := d.measurePressureAndAltitude()
-					if err == nil {
-						pressure = p
-						altitude = a
-					}
-					if err == nil && d.pressures == nil && d.altitudes == nil {
-						d.pressures = make(chan int32)
-						d.altitudes = make(chan float64)
-					}
-				*/
-			case d.temps <- temp:
-			case d.pressures <- pressure:
-			case d.altitudes <- altitude:
-			case <-d.quit:
-				d.temps = nil
-				d.pressures = nil
-				d.altitudes = nil
-				return
-			}
-		}
-	}()
-
-	return
-}
-
-// Close the connection to the sensor
-func (d *HDC100x) Close() {
-	if d.quit != nil {
-		d.quit <- struct{}{}
-	}
+	//	For now, just return the uncompensated temp
+	log.Printf("Returing temp: %v\n", cTemp)
+	return fTemp, nil
 }
