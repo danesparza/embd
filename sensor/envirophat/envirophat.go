@@ -1,16 +1,16 @@
 /*
-	This is a library for the HDC1008 Humidity & Temp Sensor
-	Designed specifically to work with the HDC100x sensor from Adafruit
-	----> https://www.adafruit.com/products/2635
+	This is a library for the Enviro-phat Sensor
+	Designed specifically to work with the Enviro-phat sensor from Pimoroni
+	----> https://shop.pimoroni.com/products/enviro-phat
 
 	These sensors use I2C to communicate, 2 pins are required to
 	interface
 
 	Written by Dan Esparza.
 
-	For more information on the I2C operations for this sensor
-	see the spec sheet located here (specifically pages 10-15):
-	http://www.adafruit.com/datasheets/hdc1008.pdf
+	For more information on the I2C operations for the accelerometer sensor
+	see the spec sheet located here (specifically pages 22-29):
+	http://www.st.com/resource/en/datasheet/lsm303d.pdf
 */
 
 package envirophat
