@@ -3,6 +3,7 @@ Repository for [embd](https://github.com/kidoman/embd) based sensors
 
 ## Sensors included
 * [Texas instruments HDC1008](https://learn.adafruit.com/adafruit-hdc1008-temperature-and-humidity-sensor-breakout/overview) - Temperature and Humidity sensor.  
+* [Pimoroni Enviro-phat](http://docs.pimoroni.com/envirophat/) - Sensor package for Raspberry pi.  Support for the lsm303d accelerometer.
 
 ## Examples
 ### HDC100x
