@@ -1,4 +1,4 @@
-# embd
+# embd [![CircleCI](https://circleci.com/gh/danesparza/embd.svg?style=svg)](https://circleci.com/gh/danesparza/embd)
 Repository for [embd](https://github.com/kidoman/embd) based sensors
 
 ## Sensors included
