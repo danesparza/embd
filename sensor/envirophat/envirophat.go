@@ -84,7 +84,7 @@ func (d *Envirophat) Accelerometer() (x float64, y float64, z float64, err error
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	valx2, err := d.Bus.ReadByteFromReg(0x1D, byte(OUT_X_L_A))
+	valx2, err := d.Bus.ReadByteFromReg(lsm303dAddress, byte(OUT_X_L_A))
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -100,7 +100,7 @@ func (d *Envirophat) Accelerometer() (x float64, y float64, z float64, err error
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	valy2, err := d.Bus.ReadByteFromReg(0x1D, byte(OUT_Y_L_A))
+	valy2, err := d.Bus.ReadByteFromReg(lsm303dAddress, byte(OUT_Y_L_A))
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -116,7 +116,7 @@ func (d *Envirophat) Accelerometer() (x float64, y float64, z float64, err error
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	valz2, err := d.Bus.ReadByteFromReg(0x1D, byte(OUT_Z_L_A))
+	valz2, err := d.Bus.ReadByteFromReg(lsm303dAddress, byte(OUT_Z_L_A))
 	if err != nil {
 		return 0, 0, 0, err
 	}
